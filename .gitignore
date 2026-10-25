@@ -1,0 +1,26 @@
+# Build products
+build/
+managed_components/
+sdkconfig
+sdkconfig.old
+dependencies.lock
+*.bin
+*.elf
+*.map
+
+# Private configuration
+.env
+.env.*
+!.env.example
+server/config.yaml
+server/data/
+server/logs/
+**/secrets.*
+
+# Editors and OS
+.DS_Store
+._*
+.vscode/settings.json
+__pycache__/
+*.py[cod]
+

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>WALL-E 遥控器</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { max-width: 520px; margin: auto; padding: 24px; background:#111827; color:#f9fafb; }
+    h1 { text-align:center; }
+    #status { text-align:center; color:#fbbf24; margin-bottom:20px; }
+    .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    button { min-height:82px; border:0; border-radius:18px; font-size:22px; background:#374151; color:white; touch-action:none; }
+    button:active { background:#f59e0b; }
+    .stop { background:#b91c1c; }
+    label { display:block; margin:24px 0 8px; }
+    input[type=range] { width:100%; }
+    details { margin-top:30px; }
+    input[type=text],input[type=password] { width:100%; box-sizing:border-box; padding:10px; margin:5px 0; }
+  </style>
+</head>
+<body>
+  <h1>WALL-E</h1>
+  <div id="status">尚未连接</div>
+  <div class="pad">
+    <span></span><button data-move="forward">▲<br>前进</button><span></span>
+    <button data-move="left">◀<br>左转</button><button class="stop" id="stop">■<br>停止</button><button data-move="right">▶<br>右转</button>
+    <span></span><button data-move="backward">▼<br>后退</button><span></span>
+  </div>
+  <label>速度：<strong id="speedValue">55</strong>%</label>
+  <input id="speed" type="range" min="20" max="100" value="55">
+  <details>
+    <summary>连接设置</summary>
+    <input id="host" type="text" value="192.168.31.248" placeholder="EMQX 地址">
+    <input id="port" type="text" value="8083" placeholder="WebSocket 端口">
+    <input id="user" type="text" placeholder="MQTT 用户名（可空）">
+    <input id="password" type="password" placeholder="MQTT 密码（可空）">
+    <button id="connect">连接</button>
+  </details>
+  <script>
+    let client;
+    const status = document.querySelector('#status');
+    const speed = document.querySelector('#speed');
+    speed.oninput = () => document.querySelector('#speedValue').textContent = speed.value;
+    function connect() {
+      client?.end(true);
+      const host = document.querySelector('#host').value.trim();
+      const port = document.querySelector('#port').value.trim();
+      const options = { clientId:'walle-web-' + Math.random().toString(16).slice(2) };
+      const username = document.querySelector('#user').value;
+      const password = document.querySelector('#password').value;
+      if (username) options.username = username;
+      if (password) options.password = password;
+      status.textContent = '连接中…';
+      client = mqtt.connect(`ws://${host}:${port}/mqtt`, options);
+      client.on('connect', () => status.textContent = '已连接');
+      client.on('reconnect', () => status.textContent = '正在重连…');
+      client.on('error', e => status.textContent = '连接错误：' + e.message);
+      client.on('close', () => status.textContent = '连接已断开');
+    }
+    function publish(left, right) {
+      if (!client?.connected) return;
+      client.publish('walle/motion/drive/set', JSON.stringify({cmd:'drive',left,right,duration:500}), {qos:1,retain:false});
+    }
+    function stop() {
+      if (client?.connected) client.publish('walle/motion/stop','1',{qos:1,retain:false});
+    }
+    const vector = { forward:[1,1], backward:[-1,-1], left:[-1,1], right:[1,-1] };
+    document.querySelectorAll('[data-move]').forEach(button => {
+      let timer;
+      const start = event => {
+        event.preventDefault();
+        const [l,r] = vector[button.dataset.move];
+        const send = () => publish(l * Number(speed.value), r * Number(speed.value));
+        send(); timer = setInterval(send, 250);
+      };
+      const end = event => { event.preventDefault(); clearInterval(timer); stop(); };
+      button.addEventListener('pointerdown', start);
+      button.addEventListener('pointerup', end);
+      button.addEventListener('pointercancel', end);
+      button.addEventListener('pointerleave', end);
+    });
+    document.querySelector('#stop').onclick = stop;
+    document.querySelector('#connect').onclick = connect;
+    connect();
+  </script>
+</body>
+</html>
+

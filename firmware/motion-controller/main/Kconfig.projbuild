@@ -1,0 +1,24 @@
+menu "WALL-E motion controller"
+
+config WALLE_WIFI_SSID
+    string "Wi-Fi SSID"
+    default ""
+
+config WALLE_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default ""
+
+config WALLE_MQTT_URI
+    string "MQTT broker URI"
+    default "mqtt://192.168.31.248:1883"
+
+config WALLE_MQTT_USERNAME
+    string "MQTT username"
+    default ""
+
+config WALLE_MQTT_PASSWORD
+    string "MQTT password"
+    default ""
+
+endmenu
+

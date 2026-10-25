@@ -1,0 +1,19 @@
+#pragma once
+#include <driver/gpio.h>
+
+// Shared I2S clocks require identical input/output sample rates.
+#define AUDIO_INPUT_SAMPLE_RATE 24000
+#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_14
+#define AUDIO_I2S_GPIO_WS GPIO_NUM_13
+#define AUDIO_I2S_GPIO_DIN GPIO_NUM_12
+#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_45
+#define BOOT_BUTTON_GPIO GPIO_NUM_0
+#define DISPLAY_SDA_PIN GPIO_NUM_41
+#define DISPLAY_SCL_PIN GPIO_NUM_42
+#define DISPLAY_WIDTH 128
+#define DISPLAY_HEIGHT 64
+#define DISPLAY_MIRROR_X false
+#define DISPLAY_MIRROR_Y false
+#define SERVO_SDA_PIN GPIO_NUM_10
+#define SERVO_SCL_PIN GPIO_NUM_11

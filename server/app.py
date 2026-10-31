@@ -76,18 +76,18 @@ async def main():
     ota_task = asyncio.create_task(ota_server.start())
 
     read_config_from_api = config.get("read_config_from_api", False)
-    port = int(config["server"].get("http_port", 8003))
+    server_config = config.get("server", {})
+    port = int(server_config.get("http_port", 8003))
     if not read_config_from_api:
         logger.bind(tag=TAG).info(
             "OTA接口是\t\thttp://{}:{}/xiaozhi/ota/",
             get_local_ip(),
             port,
         )
-    logger.bind(tag=TAG).info(
-        "视觉分析接口是\thttp://{}:{}/mcp/vision/explain",
-        get_local_ip(),
-        port,
-    )
+    vision_url = server_config.get("vision_explain", "")
+    if not vision_url or "你" in vision_url:
+        vision_url = f"http://{get_local_ip()}:{port}/mcp/vision/explain"
+    logger.bind(tag=TAG).info("视觉分析接口是\t{}", vision_url)
     mcp_endpoint = config.get("mcp_endpoint", None)
     if mcp_endpoint is not None and "你" not in mcp_endpoint:
         # 校验MCP接入点格式
@@ -102,15 +102,13 @@ async def main():
 
     # 获取WebSocket配置，使用安全的默认值
     websocket_port = 8000
-    server_config = config.get("server", {})
     if isinstance(server_config, dict):
         websocket_port = int(server_config.get("port", 8000))
 
-    logger.bind(tag=TAG).info(
-        "Websocket地址是\tws://{}:{}/xiaozhi/v1/",
-        get_local_ip(),
-        websocket_port,
-    )
+    websocket_url = server_config.get("websocket", "")
+    if not websocket_url or "你" in websocket_url:
+        websocket_url = f"ws://{get_local_ip()}:{websocket_port}/xiaozhi/v1/"
+    logger.bind(tag=TAG).info("Websocket地址是\t{}", websocket_url)
 
     logger.bind(tag=TAG).info(
         "=======上面的地址是websocket协议地址，请勿用浏览器访问======="

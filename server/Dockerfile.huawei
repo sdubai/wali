@@ -1,4 +1,5 @@
-FROM ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+ARG BASE_IMAGE=ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+FROM ${BASE_IMAGE}
 
 WORKDIR /opt/xiaozhi-esp32-server
 

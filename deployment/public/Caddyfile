@@ -8,8 +8,11 @@ walle.kangqing.net {
 	@xiaozhi_ws path /xiaozhi/v1/
 	reverse_proxy @xiaozhi_ws xiaozhi-server:8000
 
-	@xiaozhi_http path /xiaozhi/ota/* /mcp/*
-	reverse_proxy @xiaozhi_http xiaozhi-server:8003
+	@xiaozhi_ota path /xiaozhi/ota/*
+	reverse_proxy @xiaozhi_ota xiaozhi-web:8002
+
+	@xiaozhi_mcp path /mcp/*
+	reverse_proxy @xiaozhi_mcp xiaozhi-server:8003
 
 	@mqtt path /mqtt
 	reverse_proxy @mqtt emqx:8083

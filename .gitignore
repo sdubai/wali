@@ -3,6 +3,7 @@ build/
 managed_components/
 sdkconfig
 sdkconfig.old
+sdkconfig*.old
 dependencies.lock
 *.bin
 *.elf
@@ -12,15 +13,22 @@ dependencies.lock
 .env
 .env.*
 !.env.example
+!**/.env.example
 server/config.yaml
 server/data/
 server/logs/
 **/secrets.*
+deployment/public/data/
+deployment/public/models/
+deployment/public/mysql/
+deployment/public/uploadfile/
+deployment/public/caddy_data/
+deployment/public/caddy_config/
 
 # Editors and OS
 .DS_Store
 ._*
-.vscode/settings.json
+**/.vscode/settings.json
 __pycache__/
 *.py[cod]
 

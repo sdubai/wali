@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+!.env.example
+data/
+logs/
+mysql/
+uploadfile/
+models/
+tmp/
+tests/
+performance_tester/
+__pycache__/
+*.py[cod]

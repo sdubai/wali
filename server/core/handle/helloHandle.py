@@ -46,7 +46,12 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
         format = audio_params.get("format")
         conn.logger.bind(tag=TAG).debug(f"客户端音频格式: {format}")
         conn.audio_format = format
-        conn.welcome_msg["audio_params"] = audio_params
+        # The client's hello describes its microphone/uplink stream (16 kHz on
+        # ESP32).  The server hello must keep the configured playback/downlink
+        # rate (24 kHz for this board). Echoing the client object here made the
+        # device believe that server audio was 16 kHz even though TTS was
+        # encoded at conn.sample_rate=24 kHz.
+        conn.client_audio_params = audio_params
     features = msg_json.get("features")
     if features:
         conn.logger.bind(tag=TAG).debug(f"客户端特性: {features}")
@@ -65,7 +70,7 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
         asyncio.create_task(send_mcp_initialize_message(conn))
 
 
-async def checkWakeupWords(conn: "ConnectionHandler", text):
+async def checkWakeupWords(conn: "ConnectionHandler", text, force=False):
     enable_wakeup_words_response_cache = conn.config[
         "enable_wakeup_words_response_cache"
     ]
@@ -83,8 +88,23 @@ async def checkWakeupWords(conn: "ConnectionHandler", text):
         return False
 
     _, filtered_text = remove_punctuation_and_length(text)
-    if filtered_text not in conn.config.get("wakeup_words"):
+    # A device-side custom wake word is reported with listen.state=detect.
+    # Its display text is not necessarily present in the server-side list, so
+    # callers handling an explicit detect event can force the cached response.
+    if not force and filtered_text not in conn.config.get("wakeup_words"):
         return False
+
+    # A single spoken wake phrase can arrive once as device-side `detect` and
+    # again as an ASR transcript. Treat the second event as handled without
+    # playing another acknowledgement.
+    now = time.monotonic()
+    last_ack = getattr(conn, "last_wakeup_ack_time", 0.0)
+    if now - last_ack < 6.0:
+        conn.logger.bind(tag=TAG).info(
+            f"忽略重复唤醒回复，间隔 {now - last_ack:.1f} 秒"
+        )
+        return True
+    conn.last_wakeup_ack_time = now
 
     conn.just_woken_up = True
     await send_tts_message(conn, "start")

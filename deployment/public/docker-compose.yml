@@ -1,0 +1,125 @@
+services:
+  xiaozhi-server:
+    build:
+      context: ../../server
+      dockerfile: Dockerfile.huawei
+    image: wali/xiaozhi-server:huawei-sis
+    container_name: xiaozhi-esp32-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt:
+      - seccomp:unconfined
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+    expose:
+      - "8000"
+      - "8003"
+    volumes:
+      - ./data:/opt/xiaozhi-esp32-server/data
+      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt:ro
+    networks: [backend]
+
+  xiaozhi-web:
+    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:web_latest
+    container_name: xiaozhi-esp32-server-web
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_DATASOURCE_DRUID_URL: jdbc:mysql://mysql:3306/xiaozhi_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000&autoReconnect=true&failOverReadOnly=false&maxReconnects=10
+      SPRING_DATASOURCE_DRUID_USERNAME: root
+      SPRING_DATASOURCE_DRUID_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ""
+    expose:
+      - "8002"
+    volumes:
+      - ./uploadfile:/uploadfile
+    networks: [backend]
+
+  mysql:
+    image: mysql:8.0
+    container_name: xiaozhi-esp32-server-db
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: xiaozhi_esp32_server
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+    networks: [backend]
+
+  redis:
+    image: redis:8.0-alpine
+    container_name: xiaozhi-esp32-server-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  emqx:
+    image: emqx/emqx:5.8.8
+    container_name: walle-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD}
+    volumes:
+      - ./emqx.conf:/opt/emqx/etc/emqx.conf:ro
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    expose:
+      - "8083"
+    ports:
+      - "127.0.0.1:18083:18083"
+    networks: [backend]
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: walle-caddy
+    restart: unless-stopped
+    depends_on:
+      - xiaozhi-server
+      - xiaozhi-web
+      - emqx
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../web-controller:/srv/walle-web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend]
+
+networks:
+  backend:
+
+volumes:
+  caddy_data:
+  caddy_config:
+  emqx_data:
+  emqx_log:

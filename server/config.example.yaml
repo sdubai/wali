@@ -769,6 +769,16 @@ VLLM:
     api_key: 你的api_password
 TTS:
   # 当前支持的type为edge、doubao，可自行适配
+  HuaweiSISTTS:
+    # 华为云 SIS WebSocket 实时语音合成。密钥从环境变量读取，不要写入本文件。
+    type: huawei_sis_stream
+    region: cn-north-4
+    voice: chinese_huaxiaoru_common
+    sample_rate: 16000
+    speed: 0
+    pitch: 0
+    volume: 70
+    output_dir: tmp/
   EdgeTTS:
     # 定义TTS API类型
     type: edge

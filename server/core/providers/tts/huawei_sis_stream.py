@@ -2,6 +2,8 @@ import os
 import queue
 import asyncio
 import traceback
+import threading
+import time
 
 from config.logger import setup_logging
 from core.utils.tts import MarkdownCleaner
@@ -27,6 +29,7 @@ class _StreamingCallback(RttsCallBack):
         self.audio_bytes = 0
         self.resampled_bytes = 0
         self._rate_state = None
+        self.last_audio_time = None
 
     def on_response(self, data):
         if not data or self.provider.conn.client_abort:
@@ -37,6 +40,7 @@ class _StreamingCallback(RttsCallBack):
             )
             self.first_chunk = False
         self.audio_bytes += len(data)
+        self.last_audio_time = time.monotonic()
         source_rate = int(self.provider.sample_rate)
         target_rate = int(self.provider.conn.sample_rate)
         if source_rate != target_rate:
@@ -87,7 +91,12 @@ class TTSProvider(TTSProviderBase):
         self.sk = config.get("sk") or os.getenv("HUAWEI_SIS_SK")
         self.region = config.get("region") or os.getenv("HUAWEI_SIS_REGION", "cn-north-4")
         self.project_id = config.get("project_id") or os.getenv("HUAWEI_SIS_PROJECT_ID")
-        self.voice = config.get("voice", "chinese_huaxiaoru_common")
+        # The manager stores the agent's selected voice in private_voice.
+        # Prefer it over the model-wide default so voice changes in the web UI
+        # actually take effect for each agent.
+        self.voice = config.get("private_voice") or config.get(
+            "voice", "chinese_huaxiaoru_common"
+        )
         self.sample_rate = str(config.get("sample_rate", 16000))
         self.speed = int(config.get("speed", 0))
         self.pitch = int(config.get("pitch", 0))
@@ -95,6 +104,7 @@ class TTSProvider(TTSProviderBase):
         self.service_endpoint = config.get("service_endpoint") or None
         self.report_on_last = False
         self._active_client = None
+        self._active_sentence_id = None
 
         if not self.ak or not self.sk or not self.project_id:
             raise ValueError(
@@ -138,8 +148,34 @@ class TTSProvider(TTSProviderBase):
         callback = _StreamingCallback(self, text, sentence_id)
         client = self._new_client(callback)
         self._active_client = client
+        self._active_sentence_id = sentence_id
         try:
-            client.synthesis(self._new_request(text))
+            synthesis_done = threading.Event()
+
+            def close_after_audio_finishes():
+                # Huawei sometimes leaves the request open for roughly ten
+                # seconds after its last PCM packet.  Once audio has started
+                # and remained idle for a full second, close only that request
+                # so the next sentence can begin without the artificial gap.
+                while not synthesis_done.wait(0.1):
+                    last_audio_time = callback.last_audio_time
+                    if (
+                        last_audio_time is not None
+                        and time.monotonic() - last_audio_time >= 1.0
+                    ):
+                        client._close()
+                        return
+
+            watchdog = threading.Thread(
+                target=close_after_audio_finishes,
+                name="huawei-tts-idle-close",
+                daemon=True,
+            )
+            watchdog.start()
+            try:
+                client.synthesis(self._new_request(text))
+            finally:
+                synthesis_done.set()
             if callback.error:
                 raise RuntimeError(callback.error)
             if callback.audio_bytes == 0 and not self.conn.client_abort:
@@ -149,7 +185,19 @@ class TTSProvider(TTSProviderBase):
                 f"resampled to {callback.resampled_bytes} bytes at {self.conn.sample_rate} Hz"
             )
         finally:
-            self._active_client = None
+            if self._active_client is client:
+                self._active_client = None
+                self._active_sentence_id = None
+
+    def abort_current_synthesis(self):
+        """Immediately stop an in-flight Huawei websocket synthesis."""
+        client = self._active_client
+        if client is None:
+            return
+        try:
+            client._close()
+        except Exception as exc:
+            logger.bind(tag=TAG).warning(f"Failed to abort Huawei SIS TTS: {exc}")
 
     def tts_text_priority_thread(self):
         while not self.conn.stop_event.is_set():

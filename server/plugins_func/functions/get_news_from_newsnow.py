@@ -52,7 +52,7 @@ CHANNEL_MAP = {
 }
 
 # 默认新闻来源字典，当配置中没有指定时使用
-DEFAULT_NEWS_SOURCES = "澎湃新闻;百度热搜;财联社"
+DEFAULT_NEWS_SOURCES = "IT之家;36氪;Solidot;澎湃新闻;百度热搜;财联社"
 
 def _get_newsnow_config(conn):
     # 从连接配置获取
@@ -87,7 +87,11 @@ GET_NEWS_FROM_NEWSNOW_FUNCTION_DESC = {
     "type": "function",
     "function": {
         "name": "get_news_from_newsnow",
-        "description": "当用户要求查看或收听新闻时调用（如'来条新闻''今天有什么新闻'）。",
+        "description": (
+            "当用户要求查看或收听新闻时调用。"
+            "用户询问科技、AI、数码新闻时，source必须传IT之家或36氪；"
+            "财经新闻传财联社；综合新闻传澎湃新闻。"
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -234,7 +238,7 @@ async def get_news_from_newsnow(
 
             return ActionResponse(Action.REQLLM, detail_report, None)
 
-        # 否则，获取新闻列表并随机选择一条
+        # 否则，获取新闻列表并选择三条，让“有哪些新闻”得到列表回答。
         # 将中文名称转换为英文ID
         english_source_id = None
 
@@ -264,8 +268,8 @@ async def get_news_from_newsnow(
                 None,
             )
 
-        # 随机选择一条新闻
-        selected_news = random.choice(news_items)
+        selected_news_items = random.sample(news_items, min(3, len(news_items)))
+        selected_news = selected_news_items[0]
 
         # 保存当前新闻链接到连接对象，以便后续查询详情
         if not hasattr(conn, "last_newsnow_link"):
@@ -277,12 +281,15 @@ async def get_news_from_newsnow(
         }
 
         # 构建新闻报告
+        headlines = "\n".join(
+            f"{index + 1}. {item.get('title', '未知标题')}"
+            for index, item in enumerate(selected_news_items)
+        )
         news_report = (
             f"根据下列数据，用{lang}回应用户的新闻查询请求：\n\n"
-            f"新闻标题: {selected_news['title']}\n"
-            # f"新闻来源: {source}\n"
-            f"(请以自然、流畅的方式向用户播报这条新闻标题，"
-            f"提示用户可以要求获取详细内容，此时会获取新闻的详细内容。)"
+            f"新闻来源: {source}\n{headlines}\n"
+            f"(请简洁、自然地播报这三条标题，不要只说问候语，"
+            f"最后提示用户可以选一条继续了解。)"
         )
 
         return ActionResponse(Action.REQLLM, news_report, None)

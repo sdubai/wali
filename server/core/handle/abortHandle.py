@@ -12,6 +12,11 @@ async def handleAbortMessage(conn: "ConnectionHandler"):
     conn.close_after_chat = False
     conn.client_abort = True
     conn.clear_queues()
+    # Streaming providers may be blocked waiting for their remote websocket.
+    # Close the active request now so stale speech cannot continue after abort.
+    abort_synthesis = getattr(conn.tts, "abort_current_synthesis", None)
+    if callable(abort_synthesis):
+        abort_synthesis()
     # 打断客户端说话状态
     await conn.websocket.send(
         json.dumps({"type": "tts", "state": "stop", "session_id": conn.session_id})

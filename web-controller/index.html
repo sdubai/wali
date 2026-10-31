@@ -3,88 +3,76 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-  <title>WALL-E 遥控器</title>
+  <title>瓦力运动控制台</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
-    body { max-width: 520px; margin: auto; padding: 24px; background:#111827; color:#f9fafb; }
-    h1 { text-align:center; }
-    #status { text-align:center; color:#fbbf24; margin-bottom:20px; }
-    .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-    button { min-height:82px; border:0; border-radius:18px; font-size:22px; background:#374151; color:white; touch-action:none; }
-    button:active { background:#f59e0b; }
-    .stop { background:#b91c1c; }
-    label { display:block; margin:24px 0 8px; }
-    input[type=range] { width:100%; }
-    details { margin-top:30px; }
-    input[type=text],input[type=password] { width:100%; box-sizing:border-box; padding:10px; margin:5px 0; }
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"PingFang SC",sans-serif}*{box-sizing:border-box}
+    body{max-width:720px;margin:auto;padding:18px 14px 40px;background:#0b1120;color:#f8fafc}h1{text-align:center;margin:4px 0;font-size:27px}h2{margin:0 0 14px;font-size:18px}
+    .subtitle,#status{text-align:center}.subtitle{color:#94a3b8;font-size:13px}#status{margin:9px 0 16px;color:#fbbf24;font-weight:700}
+    .card{margin:12px 0;padding:15px;border:1px solid #26354d;border-radius:18px;background:#111c30;box-shadow:0 8px 25px #0004}
+    button{border:0;border-radius:14px;min-height:52px;padding:8px 10px;background:#334155;color:white;font-size:16px;font-weight:700;touch-action:none}button:active,.active{background:#f59e0b!important;transform:scale(.98)}.stop{background:#b91c1c}
+    .drive-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:470px;margin:auto}.drive-pad button{min-height:76px;font-size:19px}
+    .speed-row,.range-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.speed-row{margin-top:16px}.value{color:#fbbf24;font-weight:800;min-width:54px;text-align:right}input[type=range]{width:100%;accent-color:#f59e0b}
+    .control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.control{padding:13px;border-radius:14px;background:#1a2941}.control h3{margin:0 0 10px;font-size:16px}.quick{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:9px}.quick.three{grid-template-columns:repeat(3,1fr)}.quick button{min-height:43px;font-size:14px}.hint{margin:8px 0 0;color:#94a3b8;font-size:12px;line-height:1.5}
+    details{margin:12px 0}summary{cursor:pointer;font-weight:700}input[type=text],input[type=password]{width:100%;padding:11px;margin:5px 0;border:1px solid #475569;border-radius:10px;background:#0f172a;color:white}.servo-list{display:grid;gap:8px;margin-top:12px}.servo-row{display:grid;grid-template-columns:82px 1fr 46px;gap:8px;align-items:center;padding:9px;border-radius:10px;background:#1a2941}.settings-button{width:100%;margin-top:7px}@media(max-width:520px){.control-grid{grid-template-columns:1fr}body{padding:12px 10px 30px}}
   </style>
 </head>
 <body>
-  <h1>WALL-E</h1>
-  <div id="status">尚未连接</div>
-  <div class="pad">
+  <h1>瓦力运动控制台</h1><div class="subtitle">按住底盘方向键持续运动，松开立即停止</div><div id="status">尚未连接</div>
+  <section class="card"><h2>底盘移动</h2><div class="drive-pad">
     <span></span><button data-move="forward">▲<br>前进</button><span></span>
     <button data-move="left">◀<br>左转</button><button class="stop" id="stop">■<br>停止</button><button data-move="right">▶<br>右转</button>
-    <span></span><button data-move="backward">▼<br>后退</button><span></span>
+    <span></span><button data-move="backward">▼<br>后退</button><span></span></div>
+    <div class="speed-row"><strong>履带速度</strong><span class="value" id="speedValue">100%</span></div><input id="speed" type="range" min="20" max="100" value="100">
+  </section>
+  <section class="card"><h2>手臂控制</h2><div class="control-grid">
+    <div class="control" data-servo-control="1"><h3>左臂</h3><div class="range-head"><span>目标角度</span><span class="value">90°</span></div><input type="range" min="10" max="170" value="90"><div class="quick"><button data-angle="60">抬起 60°</button><button data-angle="90">放下 90°</button></div></div>
+    <div class="control" data-servo-control="2"><h3>右臂</h3><div class="range-head"><span>目标角度</span><span class="value">90°</span></div><input type="range" min="10" max="170" value="90"><div class="quick"><button data-angle="120">抬起 120°</button><button data-angle="90">放下 90°</button></div></div>
+  </div><p class="hint">滑块可精确调整角度。左臂安装方向由运动板处理。</p></section>
+  <section class="card"><h2>眼睛升降</h2><div class="control-grid">
+    <div class="control" data-servo-control="3"><h3>右眼</h3><div class="range-head"><span>30°最低 / 60°最高</span><span class="value">30°</span></div><input type="range" min="30" max="60" value="30"><div class="quick"><button data-angle="60">抬起</button><button data-angle="30">放下</button></div></div>
+    <div class="control" data-servo-control="4"><h3>左眼</h3><div class="range-head"><span>140°最低 / 110°最高</span><span class="value">140°</span></div><input type="range" min="110" max="140" value="140"><div class="quick"><button data-angle="110">抬起</button><button data-angle="140">放下</button></div></div>
   </div>
-  <label>速度：<strong id="speedValue">55</strong>%</label>
-  <input id="speed" type="range" min="20" max="100" value="55">
-  <details>
-    <summary>连接设置</summary>
-    <input id="host" type="text" value="192.168.31.248" placeholder="EMQX 地址">
-    <input id="port" type="text" value="8083" placeholder="WebSocket 端口">
-    <input id="user" type="text" placeholder="MQTT 用户名（可空）">
-    <input id="password" type="password" placeholder="MQTT 密码（可空）">
-    <button id="connect">连接</button>
-  </details>
+  <div class="quick three" style="margin-top:12px">
+    <button data-eyes="up">双眼抬起</button>
+    <button data-eyes="center">双眼中立</button>
+    <button data-eyes="down">双眼降下</button>
+  </div></section>
+  <section class="card"><h2>头部控制</h2><div class="control-grid">
+    <div class="control" data-servo-control="5"><h3>左右摇头</h3><div class="range-head"><span>目标角度</span><span class="value">108°</span></div><input type="range" min="10" max="170" value="108"><div class="quick three"><button data-angle="170">向左</button><button data-angle="108">正前方</button><button data-angle="10">向右</button></div></div>
+    <div class="control"><h3>抬头 / 低头</h3><div class="range-head"><span>姿态与幅度</span><span class="value" id="pitchValue">平视</span></div><input id="pitch" type="range" min="-30" max="80" value="0"><div class="quick three"><button data-pitch="-30">低头</button><button data-pitch="0">平视</button><button data-pitch="80">抬头</button></div><p class="hint">负值控制6号（145→115）；正值控制7号（70→150）。</p></div>
+  </div></section>
+  <details class="card"><summary>高级：全部12路舵机测试</summary><div id="servos" class="servo-list"></div></details>
+  <details class="card" open><summary>MQTT连接设置</summary><input id="host" type="text" value="walle.kangqing.net" placeholder="EMQX 地址"><input id="port" type="text" value="" placeholder="WebSocket 端口（HTTPS留空）"><input id="user" type="text" placeholder="MQTT 用户名"><input id="password" type="password" placeholder="MQTT 密码"><button class="settings-button" id="connect">连接</button></details>
   <script>
-    let client;
-    const status = document.querySelector('#status');
-    const speed = document.querySelector('#speed');
-    speed.oninput = () => document.querySelector('#speedValue').textContent = speed.value;
-    function connect() {
-      client?.end(true);
-      const host = document.querySelector('#host').value.trim();
-      const port = document.querySelector('#port').value.trim();
-      const options = { clientId:'walle-web-' + Math.random().toString(16).slice(2) };
-      const username = document.querySelector('#user').value;
-      const password = document.querySelector('#password').value;
-      if (username) options.username = username;
-      if (password) options.password = password;
-      status.textContent = '连接中…';
-      client = mqtt.connect(`ws://${host}:${port}/mqtt`, options);
-      client.on('connect', () => status.textContent = '已连接');
-      client.on('reconnect', () => status.textContent = '正在重连…');
-      client.on('error', e => status.textContent = '连接错误：' + e.message);
-      client.on('close', () => status.textContent = '连接已断开');
+    let client;const statusEl=document.querySelector('#status'),speedEl=document.querySelector('#speed');let driveSpeed=100;
+    speedEl.addEventListener('input',()=>{driveSpeed=Number(speedEl.value)||100;document.querySelector('#speedValue').textContent=`${driveSpeed}%`});
+    function connect(){client?.end(true);const host=document.querySelector('#host').value.trim(),port=document.querySelector('#port').value.trim(),options={clientId:'walle-web-'+Math.random().toString(16).slice(2)},username=document.querySelector('#user').value,password=document.querySelector('#password').value;if(username)options.username=username;if(password)options.password=password;const secure=location.protocol==='https:'||location.protocol==='file:',scheme=secure?'wss':'ws',authority=port?`${host}:${port}`:host;statusEl.textContent='连接中…';client=mqtt.connect(`${scheme}://${authority}/mqtt`,options);client.on('connect',()=>statusEl.textContent='已连接，可以控制');client.on('reconnect',()=>statusEl.textContent='正在重连…');client.on('error',e=>statusEl.textContent='连接错误：'+e.message);client.on('close',()=>statusEl.textContent='连接已断开')}
+    function ready(){if(client?.connected)return true;statusEl.textContent='尚未连接 MQTT';return false}
+    function publishDrive(left,right,duration=1200){if(ready())client.publish('walle/motion/drive/set',JSON.stringify({cmd:'drive',left,right,duration}),{qos:1,retain:false})}
+    function stop(){if(!ready())return;client.publish('walle/motion/drive/set',JSON.stringify({cmd:'drive',left:0,right:0,duration:100}),{qos:1,retain:false});statusEl.textContent='底盘已停止'}
+    function publishServo(id,angle){if(!ready())return;client.publish('walle/motion/servo/set',JSON.stringify({cmd:'servo',id,angle}),{qos:1,retain:false});statusEl.textContent=`舵机 ${id} → ${angle}°`;syncServoViews(id,angle)}
+    const vectors={forward:[1,1],backward:[-1,-1],left:[-1,1],right:[1,-1]};document.querySelectorAll('[data-move]').forEach(button=>{let timer;const finish=e=>{e?.preventDefault();clearInterval(timer);timer=undefined;button.classList.remove('active');stop()};button.addEventListener('pointerdown',e=>{e.preventDefault();try{button.setPointerCapture(e.pointerId)}catch(_){ }const[l,r]=vectors[button.dataset.move],send=()=>publishDrive(l*driveSpeed,r*driveSpeed);button.classList.add('active');send();timer=setInterval(send,400)});button.addEventListener('pointerup',finish);button.addEventListener('pointercancel',finish);button.addEventListener('lostpointercapture',()=>{if(timer)finish()})});document.querySelector('#stop').addEventListener('click',stop);
+    const servoRanges={1:{min:10,max:170,value:90,name:'左臂'},2:{min:10,max:170,value:90,name:'右臂'},3:{min:30,max:60,value:30,name:'右眼'},4:{min:110,max:140,value:140,name:'左眼'},5:{min:10,max:170,value:108,name:'左右摇头'},6:{min:115,max:145,value:145,name:'低头机构'},7:{min:70,max:150,value:70,name:'抬头机构'}},allServoSliders=new Map();
+    function syncServoViews(id,angle){const slider=allServoSliders.get(Number(id));if(slider){slider.value=angle;slider.nextElementSibling.textContent=`${angle}°`}const common=document.querySelector(`[data-servo-control="${id}"] input[type=range]`);if(common){common.value=angle;common.closest('.control').querySelector('.value').textContent=`${angle}°`}}
+    function bindServoControl(control){const id=Number(control.dataset.servoControl),slider=control.querySelector('input[type=range]'),value=control.querySelector('.value');let timer;const apply=()=>{value.textContent=`${slider.value}°`;publishServo(id,Number(slider.value))};slider.addEventListener('input',()=>{value.textContent=`${slider.value}°`;clearTimeout(timer);timer=setTimeout(apply,120)});slider.addEventListener('change',()=>{clearTimeout(timer);apply()});control.querySelectorAll('[data-angle]').forEach(button=>button.addEventListener('click',()=>{slider.value=button.dataset.angle;apply()}))}document.querySelectorAll('[data-servo-control]').forEach(bindServoControl);
+    // Linked eye movement uses small alternating steps. Keep 2 degrees away
+    // from both mechanical end stops so MG996R servos do not hit the linkage.
+    const eyePoses={up:[58,112],center:[45,125],down:[32,138]};let eyeMotionToken=0;
+    const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+    async function moveEyesSoftly(targetRight,targetLeft,label){
+      const token=++eyeMotionToken,rightSlider=document.querySelector('[data-servo-control="3"] input'),leftSlider=document.querySelector('[data-servo-control="4"] input'),startRight=Number(rightSlider.value),startLeft=Number(leftSlider.value),steps=12;
+      statusEl.textContent=`${label}：缓慢移动中…`;
+      for(let step=1;step<=steps;step++){
+        if(token!==eyeMotionToken)return;
+        const right=Math.round(startRight+(targetRight-startRight)*step/steps),left=Math.round(startLeft+(targetLeft-startLeft)*step/steps);
+        publishServo(3,right);await wait(65);if(token!==eyeMotionToken)return;publishServo(4,left);await wait(65);
+      }
+      statusEl.textContent=`${label}完成`;
     }
-    function publish(left, right) {
-      if (!client?.connected) return;
-      client.publish('walle/motion/drive/set', JSON.stringify({cmd:'drive',left,right,duration:500}), {qos:1,retain:false});
-    }
-    function stop() {
-      if (client?.connected) client.publish('walle/motion/stop','1',{qos:1,retain:false});
-    }
-    const vector = { forward:[1,1], backward:[-1,-1], left:[-1,1], right:[1,-1] };
-    document.querySelectorAll('[data-move]').forEach(button => {
-      let timer;
-      const start = event => {
-        event.preventDefault();
-        const [l,r] = vector[button.dataset.move];
-        const send = () => publish(l * Number(speed.value), r * Number(speed.value));
-        send(); timer = setInterval(send, 250);
-      };
-      const end = event => { event.preventDefault(); clearInterval(timer); stop(); };
-      button.addEventListener('pointerdown', start);
-      button.addEventListener('pointerup', end);
-      button.addEventListener('pointercancel', end);
-      button.addEventListener('pointerleave', end);
-    });
-    document.querySelector('#stop').onclick = stop;
-    document.querySelector('#connect').onclick = connect;
-    connect();
+    document.querySelectorAll('[data-eyes]').forEach(button=>button.addEventListener('click',()=>{const[rightEye,leftEye]=eyePoses[button.dataset.eyes];moveEyesSoftly(rightEye,leftEye,button.textContent.trim())}));
+    const pitch=document.querySelector('#pitch'),pitchValue=document.querySelector('#pitchValue');function applyPitch(){const amount=Number(pitch.value);if(amount<0){const angle=145+amount;publishServo(7,70);setTimeout(()=>publishServo(6,angle),90);pitchValue.textContent=`低头 ${-amount}°（6号 ${angle}°）`}else if(amount>0){const angle=70+amount;publishServo(6,145);setTimeout(()=>publishServo(7,angle),90);pitchValue.textContent=`抬头 ${amount}°（7号 ${angle}°）`}else{publishServo(6,145);setTimeout(()=>publishServo(7,70),90);pitchValue.textContent='平视'}}let pitchTimer;pitch.addEventListener('input',()=>{clearTimeout(pitchTimer);pitchTimer=setTimeout(applyPitch,130)});pitch.addEventListener('change',()=>{clearTimeout(pitchTimer);applyPitch()});document.querySelectorAll('[data-pitch]').forEach(button=>button.addEventListener('click',()=>{pitch.value=button.dataset.pitch;applyPitch()}));
+    const servoList=document.querySelector('#servos');for(let id=1;id<=12;id++){const cfg=servoRanges[id]||{min:10,max:170,value:90,name:'备用'},row=document.createElement('div');row.className='servo-row';row.innerHTML=`<span>${id}号 ${cfg.name}</span><input type="range" min="${cfg.min}" max="${cfg.max}" value="${cfg.value}"><output>${cfg.value}°</output>`;const slider=row.querySelector('input'),output=row.querySelector('output');let timer;allServoSliders.set(id,slider);slider.addEventListener('input',()=>{output.textContent=`${slider.value}°`;clearTimeout(timer);timer=setTimeout(()=>publishServo(id,Number(slider.value)),120)});slider.addEventListener('change',()=>{clearTimeout(timer);publishServo(id,Number(slider.value))});servoList.appendChild(row)}
+    document.querySelector('#connect').addEventListener('click',connect);connect();
   </script>
-</body>
-</html>
-
+</body></html>

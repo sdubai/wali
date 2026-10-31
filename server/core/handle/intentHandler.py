@@ -1,6 +1,7 @@
 import json
 import uuid
 import asyncio
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,6 +33,45 @@ async def handle_user_intent(conn: "ConnectionHandler", text):
     _, filtered_text = remove_punctuation_and_length(text)
     if await check_direct_exit(conn, filtered_text):
         return True
+
+    # The local ASR often hears the robot name "瓦力" as 瓦丽/马丽/玛丽/阿丽.
+    # Treat these short greeting-only phrases as wake words so they use the
+    # cached acknowledgement instead of spending several seconds in the LLM.
+    if re.fullmatch(
+        r"(?:你好|您好|嗨)(?:瓦力|瓦利|瓦丽|瓦莉|马力|马丽|玛丽|阿力|阿丽|"
+        r"晚意|晚丽|婉丽|万里|万丽|玩意|完毕)",
+        filtered_text,
+    ):
+        if await checkWakeupWords(conn, filtered_text, force=True):
+            return True
+
+    # Numeric volume commands are deterministic device controls. Sending them
+    # through the LLM adds tens of seconds and may first query device status,
+    # even though the requested absolute value is already known.
+    volume_match = re.search(
+        r"(?:把)?(?:喇叭|扬声器|声音)?音量(?:设置|设定|调整|调节|调)?(?:到|为)?\s*(\d{1,3})\s*(?:%|％|百分比)?",
+        filtered_text,
+    )
+    if volume_match:
+        volume = max(0, min(100, int(volume_match.group(1))))
+        tool_name = "self_audio_speaker_set_volume"
+        if conn.func_handler.has_tool(tool_name):
+            conn.sentence_id = str(uuid.uuid4().hex)
+            await send_stt_message(conn, text)
+            conn.client_abort = False
+            result = await conn.func_handler.handle_llm_function_call(
+                conn,
+                {
+                    "name": tool_name,
+                    "id": str(uuid.uuid4().hex),
+                    "arguments": {"volume": volume},
+                },
+            )
+            if result and result.action in (Action.ERROR, Action.NOTFOUND):
+                speak_txt(conn, result.response or "音量设置失败")
+            else:
+                speak_txt(conn, f"音量已调到{volume}%")
+            return True
 
     # 检查是否是唤醒词
     if await checkWakeupWords(conn, filtered_text):

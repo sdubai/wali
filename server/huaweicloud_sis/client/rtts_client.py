@@ -173,11 +173,22 @@ class RttsClient:
 
     def _close(self):
         """ 服务超过20s没收到请求会自动断开 """
-        if self._thread and self._thread.is_alive():
-            self._ws.keep_running = False
-            self._thread.join()
+        # Close the websocket first. Waiting for the worker before closing can
+        # block an interruption until Huawei's websocket timeout expires.
+        # Set the state before closing: _send_request() may currently be
+        # waiting for END/CLOSE/ERROR, and websocket-client does not guarantee
+        # that on_close runs immediately when another thread calls close().
+        # Without this assignment every TTS segment waits for the full timeout.
+        self._status = WebsocketStatus.STATE_CLOSE
         if self._ws is not None:
+            self._ws.keep_running = False
             self._ws.close()
+        if (
+            self._thread
+            and self._thread.is_alive()
+            and self._thread is not threading.current_thread()
+        ):
+            self._thread.join(timeout=1)
 
     def _connect_to_websocket(self, headers):
         if self._check_connect():

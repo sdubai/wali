@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+walle.kangqing.net {
+	encode zstd gzip
+
+	@xiaozhi_ws path /xiaozhi/v1/
+	reverse_proxy @xiaozhi_ws xiaozhi-server:8000
+
+	@xiaozhi_http path /xiaozhi/ota/* /mcp/*
+	reverse_proxy @xiaozhi_http xiaozhi-server:8003
+
+	@mqtt path /mqtt
+	reverse_proxy @mqtt emqx:8083
+
+	root * /srv/walle-web
+	try_files {path} /index.html
+	file_server
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+}
+
+admin-walle.kangqing.net {
+	encode zstd gzip
+	reverse_proxy xiaozhi-web:8002
+}

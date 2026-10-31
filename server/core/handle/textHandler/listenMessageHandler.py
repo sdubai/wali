@@ -8,8 +8,7 @@ if TYPE_CHECKING:
 
 from core.utils.dialogue import Message
 from core.providers.asr.dto.dto import InterfaceType
-from core.handle.receiveAudioHandle import startToChat
-from core.handle.reportHandle import enqueue_asr_report
+from core.handle.helloHandle import checkWakeupWords
 from core.handle.sendAudioHandle import send_stt_message, send_tts_message
 from core.handle.textMessageHandler import TextMessageHandler
 from core.handle.textMessageType import TextMessageType
@@ -93,24 +92,21 @@ class ListenTextMessageHandler(TextMessageHandler):
                     conn.dialogue.put(Message(role="assistant", content=call_text))
                     return
 
-                # 识别是否是唤醒词
-                is_wakeup_words = filtered_text in conn.config.get("wakeup_words")
                 # 是否开启唤醒词回复
                 enable_greeting = conn.config.get("enable_greeting", True)
 
-                if is_wakeup_words and not enable_greeting:
-                    # 如果是唤醒词，且关闭了唤醒词回复，就不用回答
+                if not enable_greeting:
+                    # 唤醒回复关闭时，直接进入监听，不调用大模型。
                     await send_stt_message(conn, original_text)
                     await send_tts_message(conn, "stop", None)
                     conn.client_is_speaking = False
-                elif is_wakeup_words:
-                    conn.just_woken_up = True
-                    # 上报纯文字数据（复用ASR上报功能，但不提供音频数据）
-                    enqueue_asr_report(conn, "嘿，你好呀", [])
-                    await startToChat(conn, "嘿，你好呀")
                 else:
-                    conn.just_woken_up = True
-                    # 上报纯文字数据（复用ASR上报功能，但不提供音频数据）
-                    enqueue_asr_report(conn, original_text, [])
-                    # 否则需要LLM对文字内容进行答复
-                    await startToChat(conn, original_text)
+                    # state=detect itself is authoritative: custom device-side
+                    # wake words may not exist in the server configuration.
+                    # Reply from the local cache instead of sending the wake
+                    # phrase to the LLM, which used to add tens of seconds.
+                    if await checkWakeupWords(conn, original_text, force=True):
+                        return
+                    await send_stt_message(conn, original_text)
+                    await send_tts_message(conn, "stop", None)
+                    conn.client_is_speaking = False

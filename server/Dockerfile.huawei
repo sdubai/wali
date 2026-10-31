@@ -1,0 +1,9 @@
+FROM ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+
+WORKDIR /opt/xiaozhi-esp32-server
+
+# Overlay the maintained WALL-E server source on the upstream runtime image.
+COPY . /opt/xiaozhi-esp32-server/
+
+# Huawei SIS RTTS uses the websocket-client package (different from websockets).
+RUN python -m pip install --no-cache-dir websocket-client==1.8.0

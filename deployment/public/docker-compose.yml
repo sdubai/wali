@@ -67,7 +67,7 @@ services:
     networks: [backend]
 
   redis:
-    image: redis:8.0-alpine
+    image: redis:8-alpine
     container_name: xiaozhi-esp32-server-redis
     restart: unless-stopped
     healthcheck:
@@ -95,7 +95,7 @@ services:
     networks: [backend]
 
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2-alpine
     container_name: walle-caddy
     restart: unless-stopped
     depends_on:

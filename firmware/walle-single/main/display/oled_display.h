@@ -7,7 +7,7 @@
 #include <esp_lcd_panel_ops.h>
 
 class OledDisplay : public LvglDisplay {
-private:
+  private:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
 
@@ -27,9 +27,9 @@ private:
     void SetupUI_128x64();
     void SetupUI_128x32();
 
-public:
+  public:
     OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width,
-                int height, bool mirror_x, bool mirror_y);
+                int height, bool mirror_x, bool mirror_y, bool synchronous_i2c_recovery = false);
     ~OledDisplay();
 
     virtual void SetupUI() override;
@@ -40,4 +40,4 @@ public:
     void SetPowerSaveMode(bool on) override;
 };
 
-#endif  // OLED_DISPLAY_H
+#endif // OLED_DISPLAY_H

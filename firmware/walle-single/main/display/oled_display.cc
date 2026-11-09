@@ -2,6 +2,7 @@
 #include "assets/lang_config.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
+#include "oled_flush_recovery.h"
 #include "settings.h"
 
 #include <algorithm>
@@ -21,7 +22,8 @@ LV_FONT_DECLARE(font_material_symbols_30_1);
 LV_FONT_DECLARE(font_noto_emoji_30_1);
 
 OledDisplay::OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
-                         int width, int height, bool mirror_x, bool mirror_y)
+                         int width, int height, bool mirror_x, bool mirror_y,
+                         bool synchronous_i2c_recovery)
     : panel_io_(panel_io), panel_(panel) {
     width_ = width;
     height_ = height;
@@ -48,7 +50,15 @@ OledDisplay::OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handl
 #if CONFIG_SOC_CPU_CORES_NUM > 1
     port_cfg.task_affinity = 1;
 #endif
-    lvgl_port_init(&port_cfg);
+    ESP_ERROR_CHECK(lvgl_port_init(&port_cfg));
+
+    // Keep the LVGL worker out until the display AND its wait callback exist.
+    // lvgl_port_add_disp uses the same recursive mutex internally.
+    DisplayLockGuard initialization_lock(this);
+    if (!initialization_lock) {
+        ESP_LOGE(TAG, "Could not lock LVGL during OLED initialization");
+        return;
+    }
 
     ESP_LOGI(TAG, "Adding OLED display");
     const lvgl_port_display_cfg_t display_cfg = {
@@ -83,8 +93,24 @@ OledDisplay::OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handl
         return;
     }
 
-    // Note: SetupUI() should be called by Application::Initialize(), not in constructor
-    // to ensure lvgl objects are created after the display is fully initialized.
+    if (synchronous_i2c_recovery) {
+        lv_display_set_flush_wait_cb(display_, [](lv_display_t* display) {
+            walle::CompleteSynchronousOledFlush(display);
+            static int64_t last_warning_us = -5000000;
+            const int64_t now = esp_timer_get_time();
+            if (now - last_warning_us >= 5000000) {
+                ESP_LOGW(TAG, "OLED transfer missed completion; dropped frame to avoid "
+                              "busy-wait. Check I2C wiring/power.");
+                last_warning_us = now;
+            }
+        });
+        lv_timer_set_period(lv_display_get_refr_timer(display_), 100);
+        ESP_LOGI(TAG, "Synchronous I2C flush recovery enabled; refresh limited to 10Hz");
+    }
+
+    // Note: SetupUI() should be called by Application::Initialize(), not in
+    // constructor to ensure lvgl objects are created after the display is fully
+    // initialized.
 }
 
 void OledDisplay::SetupUI() {
@@ -94,7 +120,7 @@ void OledDisplay::SetupUI() {
         return;
     }
 
-    Display::SetupUI();  // Mark SetupUI as called
+    Display::SetupUI(); // Mark SetupUI as called
     if (height_ == 64) {
         SetupUI_128x64();
     } else {
@@ -148,12 +174,14 @@ void OledDisplay::Unlock() { lvgl_port_unlock(); }
 
 void OledDisplay::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
+    if (!lock)
+        return;
     if (chat_message_label_ == nullptr) {
         return;
     }
 
     // Replace all newlines with spaces
-    std::string content_str = content;
+    std::string content_str = content ? content : "";
     std::replace(content_str.begin(), content_str.end(), '\n', ' ');
 
     lv_anim_delete(chat_message_label_, nullptr);
@@ -171,6 +199,8 @@ void OledDisplay::SetChatMessage(const char* role, const char* content) {
 
 void OledDisplay::SetupUI_128x64() {
     DisplayLockGuard lock(this);
+    if (!lock)
+        return;
 
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     auto text_font = lvgl_theme->text_font()->font();
@@ -226,12 +256,14 @@ void OledDisplay::SetupUI_128x64() {
     status_bar_ = lv_obj_create(screen);
     lv_obj_set_size(status_bar_, LV_HOR_RES, 16);
     lv_obj_set_style_radius(status_bar_, 0, 0);
-    lv_obj_set_style_bg_opa(status_bar_, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_bg_opa(status_bar_, LV_OPA_TRANSP,
+                            0); // Transparent background
     lv_obj_set_style_border_width(status_bar_, 0, 0);
     lv_obj_set_style_pad_all(status_bar_, 0, 0);
     lv_obj_set_scrollbar_mode(status_bar_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE, 0);  // Use absolute positioning
-    lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 0);        // Overlap with top_bar_
+    lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE,
+                            0);                        // Use absolute positioning
+    lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 0); // Overlap with top_bar_
 
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_width(notification_label_, LV_HOR_RES);
@@ -306,6 +338,8 @@ void OledDisplay::SetupUI_128x64() {
 
 void OledDisplay::SetupUI_128x32() {
     DisplayLockGuard lock(this);
+    if (!lock)
+        return;
 
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     auto text_font = lvgl_theme->text_font()->font();
@@ -401,6 +435,8 @@ void OledDisplay::SetEmotion(const char* emotion) {
         emotion_font = lvgl_theme->large_icon_font()->font();
     }
     DisplayLockGuard lock(this);
+    if (!lock)
+        return;
     if (emotion_label_ == nullptr) {
         return;
     }
@@ -415,6 +451,8 @@ void OledDisplay::SetEmotion(const char* emotion) {
 
 void OledDisplay::SetTheme(Theme* theme) {
     DisplayLockGuard lock(this);
+    if (!lock)
+        return;
 
     auto lvgl_theme = static_cast<LvglTheme*>(theme);
     auto text_font = lvgl_theme->text_font()->font();

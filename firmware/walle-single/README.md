@@ -88,3 +88,8 @@ OLED独占I2C1，PCA9685继续使用I2C0的GPIO10/11。固件依次探测0x3C、
 
 K2只在待机状态启动测试。先按K1结束语音对话，确认屏幕回到待机，再按K2。忙碌时屏幕会提示先结束对话。
 串口 `WalleKeys: K2 GPIO39 pressed` 表示检测到了实体按键；`K2 click received` 表示短按事件已到达；`K2 ignored: state=...` 表示当前状态不允许启动；`Test gesture skipped: PCA9685 not ready` 表示音效仍可测试，但舵机驱动板未就绪。没有pressed日志时优先检查K2是否接GPIO39、公共端是否接GND。
+
+### OLED刷新失败与看门狗
+
+本板启用同步I2C专用的刷新收尾回调：OLED传输失败、未触发完成通知时丢弃这一帧，防止LVGL在等待完成标志时空转。正常帧仍由原驱动完成回调通知；该恢复不适用于异步SPI/DMA屏。初始化时持有LVGL锁直到回调安装完毕，刷新限制为10Hz，OLED界面更新锁获取失败时不再继续操作对象。看门狗没有关闭或放宽。
+若出现 `OLED transfer missed completion; dropped frame`，仍需检查OLED供电、47/42接线及接触，软件恢复不代表硬件故障已消失。

@@ -134,7 +134,7 @@ class WalleSingleBoard : public WifiBoard {
       return;
     }
     oled_display_ = new OledDisplay(io, panel, WALLE_OLED_WIDTH,
-                                    WALLE_OLED_HEIGHT, false, false);
+                                    WALLE_OLED_HEIGHT, false, false, true);
     ESP_LOGI("WalleOLED", "SSD1306 128x64 ready at 0x%02X, I2C1 SDA47 SCL42",
              address);
   }

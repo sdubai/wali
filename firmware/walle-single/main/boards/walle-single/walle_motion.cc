@@ -425,8 +425,13 @@ void StopGesture() {
 }
 void StartGesture() {
   Stop();
-  if (!pca9685_ready.load())
+  if (!pca9685_ready.load()) {
+    ESP_LOGW(
+        TAG,
+        "Test gesture skipped: PCA9685 not ready; audio test can still play");
     return;
+  }
+  ESP_LOGI(TAG, "Starting arm/eye test gesture (servos 1..4 only)");
   // Only arms and eyes. Reassembled neck and tracks stay untouched.
   for (int i = 0; i < 4; ++i)
     gesture_from[i] = servo_angles[i + 1].load();

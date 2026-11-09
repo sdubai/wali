@@ -225,7 +225,9 @@ public:
         EnterWifiConfigMode();
       });
     });
+    key2_.OnPressDown([]() { ESP_LOGI("WalleKeys", "K2 GPIO39 pressed"); });
     key2_.OnClick([this]() {
+      ESP_LOGI("WalleKeys", "K2 click received");
       Application::GetInstance().Schedule([this]() {
         auto &app = Application::GetInstance();
         if (playing_.load()) {
@@ -233,10 +235,14 @@ public:
           return;
         }
         if (app.GetDeviceState() != kDeviceStateIdle) {
-          ESP_LOGW("WalleSingle",
-                   "Finish conversation before starting the show");
+          ESP_LOGW("WalleKeys",
+                   "K2 ignored: state=%d; press K1 to end conversation first",
+                   static_cast<int>(app.GetDeviceState()));
+          GetDisplay()->ShowNotification("先按K1结束对话，再按K2", 4000);
           return;
         }
+        ESP_LOGI("WalleKeys", "K2 starting test sound and arm/eye gesture");
+        GetDisplay()->ShowNotification("音效和动作测试中", 3000);
         app.GetAudioService().ResetDecoder();
         generation_.fetch_add(1);
         playing_.store(true);

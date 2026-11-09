@@ -83,3 +83,8 @@ OLED独占I2C1，PCA9685继续使用I2C0的GPIO10/11。固件依次探测0x3C、
 ### 从OLED 47/48接线迁移
 
 断电，将OLED SCL从GPIO48移到GPIO42；SDA保持GPIO47，VCC/GND不变。然后烧录本次固件。GPIO48不再外接OLED；启动日志应出现 `WalleRGB: Board RGB cleared on GPIO48`。RGB使用与本板一致的GPIO48 WS2812接法，电源指示灯不受影响。
+
+### K2按下没有反应
+
+K2只在待机状态启动测试。先按K1结束语音对话，确认屏幕回到待机，再按K2。忙碌时屏幕会提示先结束对话。
+串口 `WalleKeys: K2 GPIO39 pressed` 表示检测到了实体按键；`K2 click received` 表示短按事件已到达；`K2 ignored: state=...` 表示当前状态不允许启动；`Test gesture skipped: PCA9685 not ready` 表示音效仍可测试，但舵机驱动板未就绪。没有pressed日志时优先检查K2是否接GPIO39、公共端是否接GND。

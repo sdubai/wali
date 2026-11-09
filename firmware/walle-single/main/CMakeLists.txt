@@ -89,6 +89,11 @@ set(BUILTIN_ICON_FONT font_material_symbols_14_1)
 
 set(EMOTE_RESOLUTION "320_240")
 
+# Refuse stale configs before they turn into a missing create_board link error.
+if(NOT CMAKE_BUILD_EARLY_EXPANSION AND NOT CONFIG_BOARD_TYPE_WALLE_SINGLE)
+    message(FATAL_ERROR "This standalone project requires WALLE_SINGLE. Run ./build-single.sh to migrate an existing sdkconfig, then rebuild.")
+endif()
+
 # Select the board source directory from Kconfig
 # Set default assets if the board uses partition table V2
 if(CONFIG_BOARD_TYPE_WALLE_SINGLE)

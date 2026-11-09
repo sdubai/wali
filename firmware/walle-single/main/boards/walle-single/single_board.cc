@@ -4,6 +4,7 @@
 #include "button.h"
 #include "codecs/no_audio_codec.h"
 #include "config.h"
+#include "display/oled_display.h"
 #include "motion_link.h"
 #include "ogg_demuxer.h"
 #include "walle_motion.h"
@@ -11,6 +12,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <driver/i2c_master.h>
+#include <esp_lcd_panel_vendor.h>
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <freertos/task.h>
@@ -34,6 +37,81 @@ public:
 void WalleCancelVoiceDrive() { MotionLink::CancelLocalDrive(); }
 
 class WalleSingleBoard : public WifiBoard {
+  i2c_master_bus_handle_t oled_bus_ = nullptr;
+  Display *oled_display_ = nullptr;
+
+  void InitializeOled() {
+    i2c_master_bus_config_t bus = {};
+    bus.i2c_port = I2C_NUM_1;
+    bus.sda_io_num = WALLE_OLED_SDA;
+    bus.scl_io_num = WALLE_OLED_SCL;
+    bus.clk_source = I2C_CLK_SRC_DEFAULT;
+    bus.glitch_ignore_cnt = 7;
+    bus.flags.enable_internal_pullup = true;
+    esp_err_t err = i2c_new_master_bus(&bus, &oled_bus_);
+    if (err != ESP_OK) {
+      ESP_LOGW("WalleOLED", "I2C1 unavailable: %s; continuing without OLED",
+               esp_err_to_name(err));
+      return;
+    }
+    uint8_t address = 0;
+    for (uint8_t candidate : {0x3c, 0x3d}) {
+      if (i2c_master_probe(oled_bus_, candidate, 50) == ESP_OK) {
+        address = candidate;
+        break;
+      }
+    }
+    if (!address) {
+      ESP_LOGW("WalleOLED",
+               "No OLED at 0x3C/0x3D on SDA47/SCL48; check SSD1306 wiring");
+      i2c_del_master_bus(oled_bus_);
+      oled_bus_ = nullptr;
+      return;
+    }
+    esp_lcd_panel_io_handle_t io = nullptr;
+    esp_lcd_panel_handle_t panel = nullptr;
+    esp_lcd_panel_io_i2c_config_t io_cfg = {};
+    io_cfg.dev_addr = address;
+    io_cfg.scl_speed_hz = 400000;
+    io_cfg.control_phase_bytes = 1;
+    io_cfg.dc_bit_offset = 6;
+    io_cfg.lcd_cmd_bits = 8;
+    io_cfg.lcd_param_bits = 8;
+    err = esp_lcd_new_panel_io_i2c(oled_bus_, &io_cfg, &io);
+    if (err == ESP_OK) {
+      esp_lcd_panel_ssd1306_config_t vendor = {};
+      vendor.height = WALLE_OLED_HEIGHT;
+      esp_lcd_panel_dev_config_t dev = {};
+      dev.reset_gpio_num = GPIO_NUM_NC;
+      dev.bits_per_pixel = 1;
+      dev.vendor_config = &vendor;
+      err = esp_lcd_new_panel_ssd1306(io, &dev, &panel);
+    }
+    if (err == ESP_OK)
+      err = esp_lcd_panel_reset(panel);
+    if (err == ESP_OK)
+      err = esp_lcd_panel_init(panel);
+    if (err == ESP_OK)
+      err = esp_lcd_panel_invert_color(panel, false);
+    if (err == ESP_OK)
+      err = esp_lcd_panel_disp_on_off(panel, true);
+    if (err != ESP_OK) {
+      ESP_LOGW("WalleOLED", "OLED init failed: %s; continuing without display",
+               esp_err_to_name(err));
+      if (panel)
+        esp_lcd_panel_del(panel);
+      if (io)
+        esp_lcd_panel_io_del(io);
+      i2c_del_master_bus(oled_bus_);
+      oled_bus_ = nullptr;
+      return;
+    }
+    oled_display_ = new OledDisplay(io, panel, WALLE_OLED_WIDTH,
+                                    WALLE_OLED_HEIGHT, false, false);
+    ESP_LOGI("WalleOLED", "SSD1306 128x64 ready at 0x%02X, I2C1 SDA47 SCL48",
+             address);
+  }
+
   Button key1_{GPIO_NUM_38, false, 3000};
   Button key2_{GPIO_NUM_39};
   Button key3_{GPIO_NUM_40};
@@ -98,6 +176,7 @@ class WalleSingleBoard : public WifiBoard {
 
 public:
   WalleSingleBoard() {
+    InitializeOled();
     WalleMotionStart();
     link_ = new MotionLink();
     link_->RegisterTools();
@@ -139,6 +218,9 @@ public:
       });
     });
     // K3 and K4 are deliberately unassigned.
+  }
+  Display *GetDisplay() override {
+    return oled_display_ ? oled_display_ : Board::GetDisplay();
   }
   AudioCodec *GetAudioCodec() override {
     static SharedClockCodec codec;

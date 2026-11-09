@@ -6,7 +6,10 @@ class WalleSingleTests(unittest.TestCase):
         audio=(BOARD/'config.h').read_text()
         audio_pins={int(x) for x in re.findall(r'#define AUDIO_\w+ GPIO_NUM_(\d+)',audio)}
         buttons={int(x) for x in re.findall(r'Button key\d+_\{GPIO_NUM_(\d+)',(BOARD/'single_board.cc').read_text())}
+        oled={int(x) for x in re.findall(r"#define WALLE_OLED_(?:SDA|SCL) GPIO_NUM_(\d+)",audio)}
         motor={4,5,6,7,15,16,10,11,1,2,14,21,8,9,19,20}
+        self.assertEqual(len(oled),2)
+        self.assertFalse(oled & (audio_pins | buttons | motor))
         self.assertEqual(audio_pins,{12,13,17,18})
         self.assertEqual(buttons,{38,39,40,41})
         self.assertFalse(audio_pins & buttons or audio_pins & motor or buttons & motor)

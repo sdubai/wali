@@ -14,3 +14,9 @@
 #define MOTION_MQTT_USERNAME ""
 #define MOTION_MQTT_PASSWORD ""
 #endif
+
+// OLED has a dedicated I2C1 bus; PCA9685 remains on I2C0 GPIO10/11.
+#define WALLE_OLED_SDA GPIO_NUM_47
+#define WALLE_OLED_SCL GPIO_NUM_48
+#define WALLE_OLED_WIDTH 128
+#define WALLE_OLED_HEIGHT 64

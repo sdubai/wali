@@ -10,6 +10,9 @@ class WalleSingleTests(unittest.TestCase):
         motor={4,5,6,7,15,16,10,11,1,2,14,21,8,9,19,20}
         self.assertEqual(len(oled),2)
         self.assertFalse(oled & (audio_pins | buttons | motor))
+        rgb={int(x) for x in re.findall(r"#define WALLE_RGB_GPIO GPIO_NUM_(\d+)",audio)}
+        self.assertEqual(len(rgb),1)
+        self.assertFalse(rgb & (oled | audio_pins | buttons | motor))
         self.assertEqual(audio_pins,{12,13,17,18})
         self.assertEqual(buttons,{38,39,40,41})
         self.assertFalse(audio_pins & buttons or audio_pins & motor or buttons & motor)

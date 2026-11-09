@@ -75,7 +75,11 @@ GitHub不保存账号密码。网页运动控制可在设备联网后，通过�
 
 ## OLED独立总线
 
-默认支持四针I2C SSD1306、128×64屏：VCC→3.3V，GND→GND，SDA→GPIO47，SCL→GPIO48。
+默认支持四针I2C SSD1306、128×64屏：VCC→3.3V，GND→GND，SDA→GPIO47，SCL→GPIO42。
 OLED独占I2C1，PCA9685继续使用I2C0的GPIO10/11。固件依次探测0x3C、0x3D地址；没有检测到屏或面板初始化失败时保留串口显示，不阻止语音和运动启动。
 正常启动日志为 `WalleOLED: SSD1306 128x64 ready ...`。屏幕沿用现有OLED界面显示网络状态、聆听/说话状态、表情和对话文字。长文本受128×64屏幕空间限制，不是完整聊天记录。
-若屏幕实际为SH1106、128×32或SPI版，需要更改驱动/尺寸，不能仅凭I2C地址识别控制芯片。GPIO48在本工程不再用于板载RGB灯。
+若屏幕实际为SH1106、128×32或SPI版，需要更改驱动/尺寸，不能仅凭I2C地址识别控制芯片。GPIO48专用于启动时关闭板载WS2812 RGB灯，不再承载OLED时钟。
+
+### 从OLED 47/48接线迁移
+
+断电，将OLED SCL从GPIO48移到GPIO42；SDA保持GPIO47，VCC/GND不变。然后烧录本次固件。GPIO48不再外接OLED；启动日志应出现 `WalleRGB: Board RGB cleared on GPIO48`。RGB使用与本板一致的GPIO48 WS2812接法，电源指示灯不受影响。

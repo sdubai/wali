@@ -17,6 +17,7 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <freertos/task.h>
+#include <led_strip.h>
 
 class SharedClockCodec : public NoAudioCodecDuplex {
 public:
@@ -39,6 +40,32 @@ void WalleCancelVoiceDrive() { MotionLink::CancelLocalDrive(); }
 class WalleSingleBoard : public WifiBoard {
   i2c_master_bus_handle_t oled_bus_ = nullptr;
   Display *oled_display_ = nullptr;
+
+  void TurnOffBoardRgb() {
+    led_strip_config_t strip = {};
+    strip.strip_gpio_num = WALLE_RGB_GPIO;
+    strip.max_leds = 1;
+    strip.color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB;
+    strip.led_model = LED_MODEL_WS2812;
+    led_strip_rmt_config_t rmt = {};
+    rmt.resolution_hz = 10000000;
+    led_strip_handle_t led = nullptr;
+    esp_err_t err = led_strip_new_rmt_device(&strip, &rmt, &led);
+    if (err == ESP_OK) {
+      err = led_strip_clear(led);
+      led_strip_del(led);
+    }
+    if (err != ESP_OK) {
+      ESP_LOGW("WalleRGB", "Could not clear RGB on GPIO48: %s",
+               esp_err_to_name(err));
+      return;
+    }
+    // Hold the data input quiet after transmitting the off frame.
+    gpio_reset_pin(WALLE_RGB_GPIO);
+    gpio_set_direction(WALLE_RGB_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(WALLE_RGB_GPIO, 0);
+    ESP_LOGI("WalleRGB", "Board RGB cleared on GPIO48");
+  }
 
   void InitializeOled() {
     i2c_master_bus_config_t bus = {};
@@ -63,7 +90,7 @@ class WalleSingleBoard : public WifiBoard {
     }
     if (!address) {
       ESP_LOGW("WalleOLED",
-               "No OLED at 0x3C/0x3D on SDA47/SCL48; check SSD1306 wiring");
+               "No OLED at 0x3C/0x3D on SDA47/SCL42; check SSD1306 wiring");
       i2c_del_master_bus(oled_bus_);
       oled_bus_ = nullptr;
       return;
@@ -108,7 +135,7 @@ class WalleSingleBoard : public WifiBoard {
     }
     oled_display_ = new OledDisplay(io, panel, WALLE_OLED_WIDTH,
                                     WALLE_OLED_HEIGHT, false, false);
-    ESP_LOGI("WalleOLED", "SSD1306 128x64 ready at 0x%02X, I2C1 SDA47 SCL48",
+    ESP_LOGI("WalleOLED", "SSD1306 128x64 ready at 0x%02X, I2C1 SDA47 SCL42",
              address);
   }
 
@@ -176,6 +203,7 @@ class WalleSingleBoard : public WifiBoard {
 
 public:
   WalleSingleBoard() {
+    TurnOffBoardRgb();
     InitializeOled();
     WalleMotionStart();
     link_ = new MotionLink();

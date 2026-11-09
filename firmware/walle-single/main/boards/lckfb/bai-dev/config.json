@@ -1,0 +1,14 @@
+{
+    "manufacturer": "lckfb",
+    "type": "bai-dev",
+    "target": "esp32s3",
+    "builds": [
+        {
+            "name": "bai-dev",
+            "sdkconfig_append": [
+                "CONFIG_USE_DEVICE_AEC=n",
+                "CONFIG_LCKFB_SERVO_KEEP_CUSTOM_FIRMWARE=y"
+            ]
+        }
+    ]
+}

@@ -1180,3 +1180,15 @@ menu "TAIJIPAI_S3_CONFIG"
 endmenu
 
 endmenu
+
+menu "Walle BLE gamepad"
+    depends on BOARD_TYPE_WALLE_SINGLE
+    config WALLE_BLE_GAMEPAD
+        bool "Enable bound X3S BLE HID controller"
+        default y
+        depends on BT_NIMBLE_ENABLED && !USE_ESP_BLUFI_WIFI_PROVISIONING
+    config WALLE_BLE_GAMEPAD_MAC
+        string "X3S public Bluetooth MAC address"
+        depends on WALLE_BLE_GAMEPAD
+        default "03:26:07:03:CA:12"
+endmenu

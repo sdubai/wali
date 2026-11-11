@@ -3,6 +3,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "ps2_pad.h"
+#include "ble_gamepad.h"
+#include "gamepad_safety.h"
 #include "ps2_servo_control.h"
 
 #include <algorithm>
@@ -374,23 +376,38 @@ void PollPs2Servos(bool active, uint16_t pressed, int right_x, int right_y) {
 }
 
 void PollPs2() {
-  static bool connected = false;
-  static bool armed = false;
+  static int previous_source = 0;
+  static walle::GamepadArmGate arm_gate;
   uint16_t pressed = 0;
   int left_x = 128, left_y = 128, right_x = 128, right_y = 128;
-  const bool valid = ReadPs2Pad(pressed, left_x, left_y, right_x, right_y);
-  if (valid != connected) {
-    ESP_LOGI(TAG, "PS2 %s",
-             valid ? "connected; release controls and center both sticks to arm"
-                   : "response lost");
-    connected = valid;
+  const bool ps2_valid = ReadPs2Pad(pressed, left_x, left_y, right_x, right_y);
+  walle::GamepadState ble;
+  const bool ble_valid = ReadBleGamepad(ble);
+  const int source = ble_valid ? 2 : ps2_valid ? 1 : 0;
+  const bool valid = source != 0;
+  if (ble_valid) {
+    pressed = ble.buttons;
+    left_x = ble.lx;
+    left_y = ble.ly;
+    right_x = ble.rx;
+    right_y = ble.ry;
   }
-  if (!valid)
-    armed = false;
-  else if (!(pressed & (0xf0 | PS2_SERVO_BUTTONS)) &&
-           Ps2StickCentered(left_x, left_y) &&
-           Ps2StickCentered(right_x, right_y))
-    armed = true;
+  if (source != previous_source) {
+    ESP_LOGI(TAG, "Controller: %s; release buttons and center sticks to arm",
+             source == 2   ? "X3S BLE"
+             : source == 1 ? "PS2"
+                           : "disconnected");
+    previous_source = source;
+  }
+  const bool armed =
+      arm_gate.Update(source, !pressed && Ps2StickCentered(left_x, left_y) &&
+                                  Ps2StickCentered(right_x, right_y));
+  static int64_t next_ble_log = 0;
+  if (ble_valid && esp_timer_get_time() >= next_ble_log) {
+    ESP_LOGI(TAG, "BLE input armed=%d buttons=%04x LX=%d LY=%d RX=%d RY=%d",
+             armed, pressed, left_x, left_y, right_x, right_y);
+    next_ble_log = esp_timer_get_time() + 3000000;
+  }
   int left = 0, right = 0;
   if (valid && armed) {
     if (pressed & 0xf0)
@@ -532,6 +549,7 @@ void WalleMotionStart() {
   InitMotors();
   Stop();
   InitPs2Pad();
+  InitBleGamepad();
   ESP_ERROR_CHECK(xTaskCreate(LocalMotionTask, "local_motion", 6144, nullptr, 4,
                               nullptr) == pdPASS
                       ? ESP_OK
